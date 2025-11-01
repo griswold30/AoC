@@ -1,0 +1,285 @@
+﻿@page "/"
+@using System.IO
+@using System.Timers
+@using System.Diagnostics
+@using System.Reflection
+@using System.Diagnostics
+@inject AoC.Server.Services.AoCScaffolder Scaffolder
+
+<h3 class="mb-4 text-center">Advent of Code Dashboard</h3>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Left: Year accordion -->
+        <div class="col-md-4 mb-3">
+            <div class="accordion" id="yearAccordion">
+                @foreach (var year in Years)
+                {
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading@year">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse@year">
+                                @year
+                            </button>
+                        </h2>
+                        <div id="collapse@year" class="accordion-collapse collapse" data-bs-parent="#yearAccordion">
+                            <div class="accordion-body">
+                                @for (int d = 1; d <= 25; d++)
+                                {
+                                    <button class="btn btn-sm m-1 @GetDayButtonClass(year, d)" @onclick="() => SelectDay(year, d)">
+                                        Day @d
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Right: Scaffold form + status + timer + recent -->
+        <div class="col-md-8">
+            <!-- Timer display -->
+            <div class="mb-3">
+                <label class="form-label">Run Part</label>
+                <div>
+                    <button class="btn btn-outline-primary btn-sm me-2" @onclick="@(() => RunPart("CSharp", 1))">C# Part 1</button>
+                    <button class="btn btn-outline-primary btn-sm me-2" @onclick="@(() => RunPart("CSharp", 2))">C# Part 2</button>
+                    <button class="btn btn-outline-success btn-sm me-2" @onclick="@(() => RunPart("Python", 1))">Python Part 1</button>
+                    <button class="btn btn-outline-success btn-sm me-2" @onclick="@(() => RunPart("Python", 2))">Python Part 2</button>
+                    <button class="btn btn-outline-danger btn-sm me-2" @onclick="@(() => RunPart("Rust", 1))">Rust Part 1</button>
+                    <button class="btn btn-outline-danger btn-sm" @onclick="@(() => RunPart("Rust", 2))">Rust Part 2</button>
+                </div>
+            </div>
+
+            @if (LastExecutionResult != null)
+            {
+                <div class="alert alert-info mt-2">
+                    Last execution took @LastExecutionTime.TotalMilliseconds ms.<br />
+                    Result: @LastExecutionResult
+                </div>
+            }
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-primary text-white">Scaffold Day</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Year</label>
+                        <select class="form-select" @bind="SelectedYear">
+                            @foreach (var y in Years)
+                            {
+                                <option value="@y">@y</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Day</label>
+                        <select class="form-select" @bind="SelectedDay">
+                            @for (int d = 1; d <= 25; d++)
+                            {
+                                <option value="@d">Day @d</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Part</label>
+                        <select class="form-select" @bind="SelectedPart">
+                            <option value="1">Part 1</option>
+                            <option value="2">Part 2</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Input</label>
+                        <textarea class="form-control" rows="5" @bind="InputText" placeholder="Enter puzzle input or test cases"></textarea>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" @bind="PersistInput" id="persistInput">
+                        <label class="form-check-label" for="persistInput">Persist input to file</label>
+                    </div>
+
+                    <button class="btn btn-success w-100" @onclick="ScaffoldDay">Scaffold Day</button>
+
+                    <div class="mt-3">
+                        <label class="form-label">Run Tests</label>
+                        <div>
+                            <button class="btn btn-outline-primary btn-sm me-2" @onclick="@(() => RunTest("CSharp"))">C#</button>
+                            <button class="btn btn-outline-success btn-sm me-2" @onclick="@(() => RunTest("Python"))">Python</button>
+                            <button class="btn btn-outline-danger btn-sm" @onclick="@(() => RunTest("Rust"))">Rust</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-info text-white">Status</div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(Message))
+                    {
+                        <div class="alert @GetMessageClass()">@Message</div>
+                    }
+                    else
+                    {
+                        <p>No actions yet.</p>
+                    }
+                </div>
+            </div>
+
+            <!-- Recent scaffolds -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white">Recent Scaffolds</div>
+                <div class="card-body">
+                    @if (RecentScaffolds.Any())
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var s in RecentScaffolds)
+                            {
+                                <li class="list-group-item">@s</li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p>No recent scaffolds.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    int SelectedYear { get; set; } = DateTime.Now.Year;
+    int SelectedDay { get; set; } = 1;
+    int SelectedPart { get; set; } = 1;
+    string InputText { get; set; }
+    bool PersistInput { get; set; } = false;
+    string Message { get; set; }
+
+    List<int> Years = Enumerable.Range(2015, DateTime.Now.Year - 2015 + 1).ToList();
+    List<string> RecentScaffolds = new List<string>();
+    HashSet<(int year, int day)> CompletedDays = new(); // tracks scaffolded days
+
+    // Timer
+    Timer _timer = new();
+    TimeSpan _elapsed = TimeSpan.Zero;
+    bool _running = false;
+
+    string ElapsedTimeDisplay => $"{_elapsed.Hours:D2}:{_elapsed.Minutes:D2}:{_elapsed.Seconds:D2}";
+
+    protected override void OnInitialized()
+    {
+        _timer.Interval = 1000;
+        _timer.Elapsed += (s, e) =>
+        {
+            if (_running)
+            {
+                _elapsed = _elapsed.Add(TimeSpan.FromSeconds(1));
+                InvokeAsync(StateHasChanged);
+            }
+        };
+    }
+
+    void StartTimer() => _running = true;
+    void StopTimer() => _running = false;
+    void ResetTimer() => _elapsed = TimeSpan.Zero;
+
+    void SelectDay(int year, int day)
+    {
+        SelectedYear = year;
+        SelectedDay = day;
+        Message = $"Selected Year {year}, Day {day}";
+    }
+
+    string GetDayButtonClass(int year, int day) =>
+        CompletedDays.Contains((year, day)) ? "btn-success" : "btn-outline-secondary";
+
+    async Task ScaffoldDay()
+    {
+        try
+        {
+            string record = $"Year {SelectedYear} Day {SelectedDay:D2} Part {SelectedPart}";
+            RecentScaffolds.Insert(0, record);
+            if (RecentScaffolds.Count > 5) RecentScaffolds.RemoveAt(5);
+                CompletedDays.Add((SelectedYear, SelectedDay));
+
+            // TODO: Scaffold logic for C#/Python/Rust (existing implementation)
+            await Scaffolder.ScaffoldDayAsync(SelectedYear, SelectedDay, "CSharp");
+            Message = $"Scaffolded {record}.";
+        }
+        catch (Exception ex)
+        {
+            Message = $"Error: {ex.Message}";
+        }
+    }
+
+    string GetMessageClass() => Message.StartsWith("Error") ? "alert-danger" : "alert-success";
+
+    void RunTest(string lang)
+    {
+        // TODO: implement actual test execution per language
+        Message = $"Running {lang} tests for Year {SelectedYear} Day {SelectedDay:D2}...";
+    }
+
+    TimeSpan LastExecutionTime;
+    string LastExecutionResult;
+
+    void RunPart(string lang, int part)
+    {
+        try
+        {
+            Stopwatch sw = Stopwatch.StartNew();
+
+            // TODO: Replace with actual code execution logic per language
+            string output = ExecutePart(lang, part);
+
+            sw.Stop();
+            LastExecutionTime = sw.Elapsed;
+            LastExecutionResult = output;
+
+            Message = $"{lang} Part {part} executed in {LastExecutionTime.TotalMilliseconds} ms. Result: {LastExecutionResult}";
+        }
+        catch (Exception ex)
+        {
+            Message = $"Error running {lang} Part {part}: {ex.Message}";
+        }
+    }
+
+void RunCSharpPart(int part)
+{
+    try
+    {
+        string dayDllPath = Path.Combine(Environment.CurrentDirectory,
+            "AoC", SelectedYear.ToString(), "CSharp", $"Day{SelectedDay:D2}", $"Day{SelectedDay:D2}.dll");
+
+        var assembly = Assembly.LoadFrom(dayDllPath);
+        var type = assembly.GetType($"AoC.{SelectedYear}.CSharp.Day{SelectedDay:D2}.Day{SelectedDay:D2}Solver");
+        var instance = Activator.CreateInstance(type);
+        var method = part == 1 ? type.GetMethod("Part1") : type.GetMethod("Part2");
+
+        Stopwatch sw = Stopwatch.StartNew();
+        var result = method.Invoke(instance, new object[] { InputText });
+        sw.Stop();
+
+        LastExecutionResult = result?.ToString();
+        LastExecutionTime = sw.Elapsed;
+        Message = $"C# Part {part} executed in {LastExecutionTime.TotalMilliseconds:F1} ms";
+    }
+    catch (Exception ex)
+    {
+        Message = $"Error executing C# Part {part}: {ex.Message}";
+    }
+}
+
+
+    string ExecutePart(string lang, int part)
+    {
+        // For now, just simulate execution
+        System.Threading.Thread.Sleep(50 + new Random().Next(100)); // simulate execution delay
+        return $"Result for {lang} Part {part}";
+    }
+
+}
