@@ -1,0 +1,332 @@
+﻿@page "/"
+@using System.IO
+@using System.Diagnostics
+@using System.Reflection
+@using AoC.Shared
+@inject IJSRuntime JS
+@inject AoC.Server.Services.ScaffoldingService Scaffolder
+
+<h3 class="mb-4 text-center">Advent of Code Dashboard</h3>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Left: Year accordion -->
+        <div class="col-md-4 mb-3">
+            <div class="accordion" id="yearAccordion">
+                @foreach (var year in Years)
+                {
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading@year">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse@year">
+                                @year
+                            </button>
+                        </h2>
+                        <div id="collapse@year" class="accordion-collapse collapse" data-bs-parent="#yearAccordion">
+                            <div class="accordion-body">
+                                @for (int d = 1; d <= 25; d++)
+                                {
+                                    <button class="btn btn-sm m-1 @GetDayButtonClass(year, d)" @onclick="() => SelectDay(year, d)">
+                                        Day @d
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Right: Run & Scaffold panel -->
+        <div class="col-md-8">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-primary text-white">Run & Scaffold</div>
+                <div class="card-body">
+
+                    <div class="mb-3">
+                        <label class="form-label">Year</label>
+                        <select class="form-select" @bind="SelectedYear">
+                            @foreach (var y in Years)
+                            {
+                                <option value="@y">@y</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3 row align-items-end">
+                        <div class="col-md-6">
+                            <label class="form-label">Day</label>
+                            <select class="form-select" @bind="SelectedDay">
+                                @for (int d = 1; d <= 25; d++)
+                                {
+                                    <option value="@d">Day @d</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-auto ms-2">
+                            <button class="btn btn-success" @onclick="ScaffoldDay">Scaffold Day</button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Part</label>
+                        <select class="form-select" @bind="SelectedPart">
+                            <option value="1">Part 1</option>
+                            <option value="2">Part 2</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <textarea class="form-control"
+                                  rows="5"
+                                  @bind="InputText"
+                                  @onpaste="OnPaste"
+                                  placeholder="Enter puzzle input or test cases"></textarea>
+                    </div>
+
+                    <!-- Run buttons below input -->
+                    <div class="mb-3">
+                        <label class="form-label">Run Part</label>
+                        <div>
+                            <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => RunCSharpPart(1)">C# Part 1</button>
+                            <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => RunCSharpPart(2)">C# Part 2</button>
+@*                             <button class="btn btn-outline-success btn-sm me-2" @onclick="() => RunPart(" Python", 1)">Python Part 1</button>
+                            <button class="btn btn-outline-success btn-sm me-2" @onclick="() => RunPart(" Python", 2)">Python Part 2</button>
+                            <button class="btn btn-outline-danger btn-sm me-2" @onclick="() => RunPart(" Rust", 1)">Rust Part 1</button>
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => RunPart(" Rust", 2)">Rust Part 2</button> *@
+                        </div>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox"
+                               @bind="PersistInput"
+                               @bind:event="onchange" id="persistInput">
+                        <label class="form-check-label" for="persistInput">Persist input to file</label>
+                    </div>
+
+                    @if (LastExecutionResult != null)
+                    {
+                        <div class="alert alert-info mt-3">
+                            Last execution took @LastExecutionTime.TotalMilliseconds ms.<br />
+                            Result: @LastExecutionResult
+                        </div>
+                    }
+
+                </div>
+            </div>
+
+            <!-- Status -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-info text-white">Status</div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(Message))
+                    {
+                        <div class="alert @GetMessageClass()">@Message</div>
+                    }
+                    else
+                    {
+                        <p>No actions yet.</p>
+                    }
+                </div>
+            </div>
+
+            <!-- Recent Scaffolds -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white">Recent Scaffolds</div>
+                <div class="card-body">
+                    @if (RecentScaffolds.Any())
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var s in RecentScaffolds)
+                            {
+                                <li class="list-group-item">@s</li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p>No recent scaffolds.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    int SelectedYear { get; set; } = DateTime.Now.Year;
+    int SelectedDay { get; set; } = 1;
+    int SelectedPart { get; set; } = 1;
+    bool PersistInput { get; set; }
+    string InputText { get; set; } = string.Empty;
+    string Message { get; set; } = string.Empty;
+
+    List<int> Years = Enumerable.Range(2015, DateTime.Now.Year - 2015 + 1).ToList();
+    List<string> RecentScaffolds = new();
+    HashSet<(int year, int day)> CompletedDays = new();
+
+    TimeSpan LastExecutionTime;
+    string? LastExecutionResult;
+
+    bool _initialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            SelectedYear = await GetFromLocalStorage("aoc-year", DateTime.Now.Year);
+            SelectedDay = await GetFromLocalStorage("aoc-day", 1);
+            SelectedPart = await GetFromLocalStorage("aoc-part", 1);
+
+            // Load persisted input if it exists
+            LoadPersistedInput();
+
+            StateHasChanged();
+        }
+    }
+
+    async Task SaveDefaults()
+    {
+        await SetToLocalStorage("aoc-year", SelectedYear);
+        await SetToLocalStorage("aoc-day", SelectedDay);
+        await SetToLocalStorage("aoc-part", SelectedPart);
+    }
+
+    void SelectDay(int year, int day)
+    {
+        SelectedYear = year;
+        SelectedDay = day;
+        Message = $"Selected Year {year}, Day {day}";
+
+        LoadPersistedInput();
+    }
+
+    void LoadPersistedInput()
+    {
+        try
+        {
+            var path = GetInputFilePath();
+            if (File.Exists(path))
+            {
+                InputText = File.ReadAllText(path);
+            }
+            else
+            {
+                InputText = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to load input: {ex.Message}");
+            InputText = string.Empty;
+        }
+    }
+
+    async Task ScaffoldDay()
+    {
+        try
+        {
+            await SaveDefaults();
+            await Scaffolder.ScaffoldDayAsync(SelectedYear, SelectedDay, "CSharp");
+
+            var record = $"Year {SelectedYear} Day {SelectedDay:D2} Part {SelectedPart}";
+            RecentScaffolds.Insert(0, record);
+            if (RecentScaffolds.Count > 5) RecentScaffolds.RemoveAt(5);
+            CompletedDays.Add((SelectedYear, SelectedDay));
+
+            Message = $"✅ Scaffolded {record}.";
+        }
+        catch (Exception ex)
+        {
+            Message = $"❌ Error: {ex.Message}";
+        }
+    }
+
+    async Task OnPaste(ClipboardEventArgs e)
+    {
+        await Task.Delay(50);
+        InputText = await JS.InvokeAsync<string>("eval", "document.querySelector('textarea').value");
+        StateHasChanged();
+    }
+
+    async Task RunCSharpPart(int part)
+    {
+        await SaveInputIfPersisted(); // save if checkbox is checked
+        await SaveDefaults();
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            var solutionDir = UtilityFunctions.FindSolutionDirectory() ?? throw new InvalidOperationException("Solution not found");
+            var projectDir = Path.Combine(solutionDir, $"AoC.{SelectedYear}", "CSharp");
+            var dllPath = Path.Combine(projectDir, "bin", "Debug", "net8.0", $"AoC.{SelectedYear}.dll");
+
+            if (!File.Exists(dllPath))
+                throw new InvalidOperationException($"DLL not found at {dllPath}");
+
+            var asm = Assembly.LoadFrom(dllPath);
+            var type = asm.GetType($"AoC._{SelectedYear}.Days.Day{SelectedDay:D2}")
+                       ?? throw new InvalidOperationException($"Type Day{SelectedDay:D2} not found");
+            var method = type.GetMethod($"Part{part}")
+                       ?? throw new InvalidOperationException($"Method Part{part} not found");
+
+            var result = method.Invoke(Activator.CreateInstance(type), new object?[] { InputText });
+
+            LastExecutionResult = result?.ToString() ?? "(null)";
+            stopwatch.Stop();
+            LastExecutionTime = stopwatch.Elapsed;
+            Message = $"✅ C# Part {part} ran successfully.";
+        }
+        catch (Exception ex)
+        {
+            Message = $"❌ Error running C# Part {part}: {ex.Message}";
+        }
+    }
+
+    void RunPart(string lang, int part)
+    {
+        SaveDefaults();
+        Message = $"Running {lang} Part {part} (stub for future expansion).";
+    }
+
+    string GetDayButtonClass(int year, int day) =>
+        CompletedDays.Contains((year, day)) ? "btn-success" : "btn-outline-secondary";
+
+    string GetMessageClass() => Message.StartsWith("❌") ? "alert-danger" : "alert-success";
+
+    async Task<int> GetFromLocalStorage(string key, int defaultValue)
+    {
+        var value = await JS.InvokeAsync<string>("localStorage.getItem", key);
+        return int.TryParse(value, out var result) ? result : defaultValue;
+    }
+
+    async Task SetToLocalStorage(string key, int value)
+    {
+        await JS.InvokeVoidAsync("localStorage.setItem", key, value.ToString());
+    }
+
+    string GetInputFilePath()
+    {
+        var solutionDir = UtilityFunctions.FindSolutionDirectory() ?? throw new InvalidOperationException("Solution not found");
+        var projectDir = Path.Combine(solutionDir, $"AoC.{SelectedYear}");
+        Directory.CreateDirectory(projectDir); // ensure folder exists
+
+        return Path.Combine(projectDir, $"Day{SelectedDay:D2}.input.txt");
+    }
+
+    async Task SaveInputIfPersisted()
+    {
+        if (!PersistInput) return;
+
+        try
+        {
+            var path = GetInputFilePath();
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await File.WriteAllTextAsync(path, InputText);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to save input: {ex.Message}");
+        }
+    }
+}
