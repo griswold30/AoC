@@ -1,12 +1,13 @@
-﻿using System.Diagnostics;
+﻿using AoC.Shared;
+using System.Diagnostics;
 using System.Text;
 using System.Xml.Linq;
 
 namespace AoC.Server.Services
 {
-    public class AoCScaffolder
+    public class ScaffoldingService
     {
-        public AoCScaffolder()
+        public ScaffoldingService()
         {
         }
 
@@ -18,7 +19,7 @@ namespace AoC.Server.Services
             var testClassName = $"{className}Tests";
 
             // Solution directory structure
-            var solutionDir = FindSolutionDirectory();
+            var solutionDir = UtilityFunctions.FindSolutionDirectory();
             var testDir = Path.Combine(solutionDir, "AoC.Tests");
 
             // Create day folders
@@ -197,16 +198,5 @@ namespace AoC.Server.Services
             else
                 Console.WriteLine($"⚠️ Failed to add project to solution: {projPath}\n{stdErr}");
         }
-
-        private static string? FindSolutionDirectory()
-        {
-            var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-            while (dir != null && !dir.GetFiles("*.sln").Any())
-            {
-                dir = dir.Parent;
-            }
-            return dir?.FullName;
-        }
-
     }
 }

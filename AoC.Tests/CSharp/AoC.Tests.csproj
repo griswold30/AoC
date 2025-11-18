@@ -21,4 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\AoC.2025\CSharp\Aoc.2025.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\AoC.2023\CSharp\Aoc.2023.csproj" />
+  </ItemGroup>
 </Project>

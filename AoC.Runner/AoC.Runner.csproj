@@ -10,4 +10,8 @@
     <Folder Include="Data\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\AoC.2023\CSharp\AoC.2023.csproj" />
+  </ItemGroup>
+
 </Project>
