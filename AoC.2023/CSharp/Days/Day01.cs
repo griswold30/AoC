@@ -1,5 +1,4 @@
 ﻿using AoC.Shared;
-using System.Diagnostics;
 
 namespace AoC._2023.Days
 {
@@ -54,76 +53,51 @@ namespace AoC._2023.Days
                 ["six"] = 6,
                 ["seven"] = 7,
                 ["eight"] = 8,
-                ["nine"] = 9
+                ["nine"] = 9,
+                ["1"] = 1,
+                ["2"] = 2,
+                ["3"] = 3,
+                ["4"] = 4,
+                ["5"] = 5,
+                ["6"] = 6,
+                ["7"] = 7,
+                ["8"] = 8,
+                ["9"] = 9,
             };
 
-            var reversedDictionary = ReversedDictionary(translationDictionary);
-
-            var numbersAsWords = translationDictionary.Keys.ToList();
-            var reversedNumberAsWords = reversedDictionary.Keys.ToList();
-
             int sumOfNumbers = 0;
-            for (var i = 0; i < lines.Length; i++)
+            for (var l = 0; l < lines.Length; l++)
             {
-                var line = lines[i];
-                var foundFirst = false;
-                var foundLast = false;
+                var line = lines[l];
+                int firstNumber = -1;
+                int lastNumber = -1;
 
-                int firstDigit = 0;
-                int lastDigit = 0;
+                int firstIndex = line.Length;
+                int lastIndex = -1;
 
-                for (int j = 0; j < line.Length; j++)
+                foreach (var kvp in translationDictionary)
                 {
-                    for (int k = 0; k < line.Length; k++)
+                    var indexOfKey = line.IndexOf(kvp.Key);
+                    
+                    if (indexOfKey != -1 && indexOfKey < firstIndex)
                     {
-                        var startString = line.Substring(j, k + 1);
-                        var endString = line[^(j + k + 1)..^j];
-
-                        if (!foundFirst)
-                        {
-                            foundFirst = int.TryParse(startString, out firstDigit);
-                            foundFirst = foundFirst || translationDictionary.TryGetValue(startString, out firstDigit);
-                        }
-
-                        if (!foundLast)
-                        {
-                            foundLast = int.TryParse(endString, out lastDigit);
-                            foundLast = foundLast || translationDictionary.TryGetValue(endString, out lastDigit);
-                        }
-
-                        if (foundFirst && foundLast) break;
-
-                        if ((!foundFirst && numbersAsWords.Any(x => x.StartsWith(startString, StringComparison.CurrentCultureIgnoreCase))) ||
-                            (!foundLast && numbersAsWords.Any(x => x.EndsWith(endString, StringComparison.CurrentCultureIgnoreCase))))
-                        {
-                            continue;
-                        }
-
-                        break;
+                        firstIndex = indexOfKey;
+                        firstNumber = kvp.Value;
                     }
 
-                    if (foundFirst && foundLast)
+                    indexOfKey = line.LastIndexOf(kvp.Key);
+                    if (indexOfKey > lastIndex)
                     {
-                        Debug.WriteLine($"Found Numbers in line {firstDigit} and {lastDigit}: {line}");
-                        sumOfNumbers += int.Parse($"{firstDigit}{lastDigit}");
-                        break;
+                        lastIndex = indexOfKey;
+                        lastNumber = kvp.Value;
                     }
+
                 }
+            
+                sumOfNumbers += firstNumber * 10 + lastNumber;
             }
 
             return sumOfNumbers.ToString();
-        }
-
-        private Dictionary<string, int> ReversedDictionary(Dictionary<string, int> dict)
-        {
-            Dictionary<string, int> reversedDictionary = new();
-
-            foreach (var (key, value) in dict)
-            {
-                reversedDictionary[new String(key.Reverse().ToArray())] = value;
-            }
-
-            return reversedDictionary;
         }
     }
 }
